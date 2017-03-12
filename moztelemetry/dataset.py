@@ -134,25 +134,6 @@ class Dataset:
         return Dataset(self.bucket, self.schema, store=self.store,
                        prefix=self.prefix, selection=new_selection)
 
-    def _compile_selection(self):
-        if not self.selection:
-            self.selection_compiled = ""
-        else:
-            path = ','.join(['"%s":%s' % (k, v) for k, v in self.selection.items()]).join('{}')
-            self.selection_compiled = jmespath.compile(path)
-
-    def _apply_selection(self, json_obj):
-        if not self.selection:
-            return json_obj
-
-        # This is mainly for testing purposes.
-        # For perfomance reasons the selection should be compiled
-        # outside of this function.
-        if not self.selection_compiled:
-            self._compile_selection()
-
-        return self.selection_compiled.search(json_obj)
-
     def where(self, **kwargs):
         """Return a new Dataset refined using the given condition
 
@@ -245,11 +226,14 @@ class Dataset:
         if decode is None:
             decode = message_parser.parse_heka_message
 
-        self._compile_selection()
+        results = rdd.map(lambda x: self.store.get_key(x['key'])) \
+                  .flatMap(lambda x: decode(x))
 
-        return rdd.map(lambda x: self.store.get_key(x['key'])) \
-                  .flatMap(lambda x: decode(x)) \
-                  .map(lambda x: self._apply_selection(x))
+        if self.selection:
+            path = ','.join(['"%s":%s' % (k, v) for k, v in self.selection.items()]).join('{}')
+            results = results.map(lambda x: jmespath.search(path, x))
+
+        return results
 
     @staticmethod
     def from_source(source_name):
