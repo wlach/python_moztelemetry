@@ -231,8 +231,9 @@ class Dataset:
 
         if self.selection:
             path = ','.join(['"%s":%s' % (k, v) for k, v in self.selection.items()]).join('{}')
-            print path
-            results = results.map(lambda z: jmespath.search(path, z))
+            from functools import partial
+            search = partial(jmespath.search, path)
+            results = results.map(search)
 
         return results
 

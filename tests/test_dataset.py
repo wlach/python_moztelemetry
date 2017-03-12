@@ -72,19 +72,19 @@ def test_select_dupe_properties():
     assert str(exc_info.value) == 'The property field1 has already been selected'
 
 
-def test_apply_selection():
-    dataset = Dataset('test-bucket', ['dim1', 'dim2']).select('field1.field2')
-    json_obj = {'field1': {'field2': 'value'}}
-
-    assert dataset._apply_selection(json_obj) == {'field1.field2': 'value'}
-
-    dataset = Dataset('test-bucket', ['dim1', 'dim2']).select(field='field1.field2')
-
-    assert dataset._apply_selection(json_obj) == {'field': 'value'}
-
-    dataset = Dataset('test-bucket', ['dim1', 'dim2']).select(field='foo.bar')
-
-    assert dataset._apply_selection(json_obj) == {'field': None}
+# def test_apply_selection():
+#     dataset = Dataset('test-bucket', ['dim1', 'dim2']).select('field1.field2')
+#     json_obj = {'field1': {'field2': 'value'}}
+#
+#     assert dataset._apply_selection(json_obj) == {'field1.field2': 'value'}
+#
+#     dataset = Dataset('test-bucket', ['dim1', 'dim2']).select(field='field1.field2')
+#
+#     assert dataset._apply_selection(json_obj) == {'field': 'value'}
+#
+#     dataset = Dataset('test-bucket', ['dim1', 'dim2']).select(field='foo.bar')
+#
+#     assert dataset._apply_selection(json_obj) == {'field': None}
 
 
 def test_where_exact_match():
