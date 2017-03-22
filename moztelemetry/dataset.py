@@ -19,25 +19,21 @@ from .store import S3Store
 MAX_CONCURRENCY = int(cpu_count() * 1.5)
 
 
-def _group_by_size(obj_list):
-    """Partitions a list of objects by cumulative size
+def _group_by_size_greedy(obj_list, tot_groups):
+    """Partition a list of objects using a greedy strategy
 
+    The local optimum choice is to always put an object in the smallest bucket.
     :param obj_list: a list of dict-like objects with a 'size' property
+    :param tot_groups: number of partitions to split the data into.
     :return: a list of lists, one for each partition.
     """
-    threshold = 2 ** 31
-
-    def group_reducer(acc, obj):
-        curr_size, output = acc
-        if curr_size + obj['size'] < threshold:
-            output[-1].append(obj)
-            return curr_size + obj['size'], output
-        else:
-            output.append([obj])
-            return obj['size'], output
-
-    return reduce(group_reducer, obj_list, (0, [[]]))[1]
-
+    sorted_list = sorted(obj_list, key=lambda x: x['size'], reverse=True)
+    groups = [[0, []] for _ in range(tot_groups)]
+    for obj in sorted_list:
+        smallest_group = min(groups, key=lambda x: x[0])
+        smallest_group[0] += obj['size']
+        smallest_group[1].append(obj)
+    return [group[1] for group in groups]
 
 
 def _pickle_method(m):
@@ -182,14 +178,8 @@ class Dataset:
             summaries = random.sample(summaries,
                                       int(len(summaries) * sample))
 
-        groups = list(_group_by_size(summaries))
-        if len(groups) < sc.defaultParallelism:
-            # If there are not enough groups to fill the available resources
-            # we have many small files, so no need to group by cumulative size.
-            rdd = sc.parallelize(summaries, 2*sc.defaultParallelism)
-        else:
-            rdd = sc.parallelize(groups, len(groups)) \
-                    .flatMap(lambda x:x)
+        groups = _group_by_size_greedy(summaries, 10 * sc.defaultParallelism)
+        rdd = sc.parallelize(groups, len(groups)).flatMap(lambda x: x)
 
         if decode is None:
             decode = message_parser.parse_heka_message
